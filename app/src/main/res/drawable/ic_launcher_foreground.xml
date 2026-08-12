@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Иконка: спортсмен в «стрелочке» входит в воду. Безопасная зона адаптивной иконки 18..90. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- вышка слева -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.45"
+        android:pathData="M22,24 h9 v56 h-9 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.45"
+        android:pathData="M22,24 h22 v5 h-22 z" />
+
+    <!-- тело: от кистей вверху-слева до носков внизу-справа -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="8"
+        android:strokeLineCap="round"
+        android:pathData="M52,72 L70,32" />
+
+    <!-- вытянутые руки -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M45,87 L52,72" />
+
+    <!-- голова -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M55,66 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+
+    <!-- вода -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:pathData="M20,88 q8,-6 16,0 q8,6 16,0 q8,-6 16,0 q8,6 16,0" />
+</vector>

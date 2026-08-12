@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'ru.fvvsr.diving10m'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "ru.fvvsr.diving10m"
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        debug {
+            // отладочная сборка: ставится с «неизвестных источников», подпись автоматическая
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
