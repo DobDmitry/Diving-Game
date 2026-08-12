@@ -5,3 +5,5 @@ local.properties
 .idea/
 .DS_Store
 out/
+*.apk
+*.zip
