@@ -225,8 +225,25 @@ function tick(){
  requestAnimationFrame(tick);
 }
 
-buildGrads();
-render();
+/* если art.js не подгрузился — сказать об этом словами, а не показывать пустоту */
+if(typeof drawBody==="undefined"||typeof POSES==="undefined"){
+ const C2=cv.getContext("2d");
+ cv.width=1100;cv.height=280;
+ C2.fillStyle="#2B323B";C2.fillRect(0,0,cv.width,cv.height);
+ C2.fillStyle="#F5C244";C2.font="600 22px 'Segoe UI',sans-serif";
+ C2.fillText("art.js не загрузился",30,60);
+ C2.fillStyle="#E6ECF3";C2.font="16px 'Segoe UI',sans-serif";
+ C2.fillText("Стенд открыт, но рисующий слой рядом не нашёлся.",30,100);
+ C2.fillText("Проверьте, что art.js лежит в той же папке, что и bench.html,",30,130);
+ C2.fillText("и что страница открыта через локальный сервер, а не как файл:",30,158);
+ C2.fillStyle="#8FD4A8";C2.font="15px Consolas,monospace";
+ C2.fillText("npx serve \"" + location.pathname.replace(/\/[^\/]*$/,"").replace(/^\//,"") + "\"",30,196);
+ C2.fillStyle="#7E93A8";C2.font="14px 'Segoe UI',sans-serif";
+ C2.fillText("Подробности — в консоли браузера (F12).",30,232);
+}else{
+ buildGrads();
+ render();
+}
 </script>
 </body>
 </html>
