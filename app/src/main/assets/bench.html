@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Стенд — Вышка 10 м</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",system-ui,sans-serif;background:#20262E;color:#E6ECF3;padding:10px}
+h1{font-size:15px;font-weight:600;margin-bottom:8px;color:#9FB6CC}
+h1 b{color:#E6ECF3}
+.row{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+button{font-family:inherit;font-size:12.5px;padding:6px 11px;border:1px solid #3A434F;border-radius:7px;
+ background:#2B323B;color:#E6ECF3;cursor:pointer}
+button.sel{background:#3E7FBF;border-color:#3E7FBF;color:#fff}
+button:hover{border-color:#5C6B7A}
+label{font-size:12px;color:#9FB6CC;display:flex;align-items:center;gap:5px}
+input[type=range]{width:150px}
+#cv{display:block;width:100%;background:#E8F1FA;border-radius:8px;border:1px solid #3A434F}
+.hint{font-size:11.5px;color:#7E93A8;margin-top:7px;line-height:1.5}
+code{background:#2B323B;padding:1px 5px;border-radius:4px;color:#B8D4EC}
+</style>
+</head>
+<body>
+
+<h1>Стенд рисующего слоя — <b>art.js</b></h1>
+
+<div class="row" id="tabs"></div>
+<div class="row">
+  <label><input type="checkbox" id="anim"> анимация</label>
+  <label>поворот <input type="range" id="rot" min="-180" max="180" value="0"> <span id="rotV">0°</span></label>
+  <label>масштаб <input type="range" id="zoom" min="10" max="140" value="45"> <span id="zoomV">4.5×</span></label>
+  <button id="reload">перечитать art.js</button>
+</div>
+
+<canvas id="cv" width="1400" height="900"></canvas>
+
+<div class="hint">
+  Стенд подключает тот же <code>art.js</code>, что и игра, и рисует его функции напрямую.
+  Игровой логики здесь нет вовсе — состояние подставлено заглушками, поэтому физику
+  сломать невозможно. Правите <code>art.js</code> → жмёте «перечитать» → видите результат.
+</div>
+
+<!-- тот же рисующий слой, что и в игре -->
+<script src="art.js"></script>
+<script>
+"use strict";
+
+/* ── заглушки состояния игры ──────────────────────────────────────────
+   art.js читает их во время вызова. Здесь они статичны: стенд не считает
+   физику, а просто ставит фигуру в нужную позу и точку.               */
+let state="idle", y=6, rot=0, tucked=false, opened=false, ripUsed=false;
+let entryX=210, entryAng=0, shake=0, hints=true, slow=1;
+let x0=128, vx=26, tF=0, vy=0, lineupT=0;
+let cardT=0, cardScores=[9.5,9,9.5,10,9,9.5,9.5];
+const CARD_T=4.2, RIP_OPEN=3.0, G=9.81;
+let mode="train", meetRows=[], sel=1;
+const MEET_PROG=["107B","207C","307C","407C","109C","209C"];
+let lastRes=null;
+let drops=[], rings=[], jets=[], bubbles=[], foam=[], crown=[];
+
+/* минимальная таблица прыжков — нужна табло и подписям */
+const dives=[
+ {num:"105B",name:"2½ вперёд, согнувшись",cls:1,dd:2.3,req:2.5,pk:1,f:1,dir:1,sty:"fw",spd:900,yLine:3},
+ {num:"107B",name:"3½ вперёд, согнувшись",cls:1,dd:3.0,req:3.5,pk:1,f:1,dir:1,sty:"fw",spd:900,yLine:3},
+ {num:"207C",name:"3½ назад, в группировке",cls:2,dd:3.3,req:3.5,pk:0,f:-1,dir:1,sty:"bk",spd:900,yLine:3},
+ {num:"307C",name:"3½ оборотных, в группировке",cls:3,dd:3.4,req:3.5,pk:0,f:1,dir:-1,sty:"bk",spd:900,yLine:3}
+];
+function curX(){return 150;}
+function standX(){return dives[sel].f===-1?137:128;}
+function openErr(){return 0;}
+
+/* ── инфраструктура стенда ───────────────────────────────────────── */
+const $=id=>document.getElementById(id);
+const C=cv.getContext("2d");
+let tab="Позы", rotDeg=0, zoomK=4.5, animOn=false;
+
+function fitCanvas(){
+ const w=Math.min(1400,Math.round(cv.getBoundingClientRect().width*(window.devicePixelRatio||1)));
+ if(cv.width!==w){cv.width=w;cv.height=Math.round(w*0.64);}
+ view.s=1;view.ox=0;view.oy=0;
+}
+
+/* нарисовать что-то в отдельной ячейке контрольного листа */
+function panel(i,n,title,fn,zk){
+ const cols=Math.min(n,Math.ceil(Math.sqrt(n)*1.4)),rows=Math.ceil(n/cols);
+ const pw=cv.width/cols, ph=cv.height/rows;
+ const cx=(i%cols)*pw+pw/2, cy=Math.floor(i/cols)*ph+ph/2;
+ ctx.save();
+ ctx.beginPath();ctx.rect((i%cols)*pw,Math.floor(i/cols)*ph,pw,ph);ctx.clip();
+ ctx.translate(cx,cy);ctx.scale(zk||zoomK,zk||zoomK);
+ fn();
+ ctx.restore();
+ ctx.setTransform(1,0,0,1,0,0);
+ ctx.fillStyle="#5B7089";ctx.font="600 13px 'Segoe UI',sans-serif";
+ ctx.fillText(title,(i%cols)*pw+10,Math.floor(i/cols)*ph+20);
+}
+
+/* видимый прямоугольник мира — фоновые функции рисуют по нему */
+function setVis(x0v,y0v,w,h){vis={x0:x0v,y0:y0v,w:w,h:h};}
+
+const TABS={
+ "Позы":()=>{
+  const names=["stand","hopFw","squatBk","line","openFw","openBk","tuck","pike"];
+  names.forEach((nm,i)=>panel(i,names.length,nm,()=>{
+   const p=POSES[nm];drawBody(0,0,rotDeg*Math.PI/180,1,p,comOf(p));
+  }));
+ },
+ "Тело":()=>{
+  const names=["pike","openFw","openBk","line"];
+  names.forEach((nm,i)=>panel(i,names.length,nm+"  (зеркально →)",()=>{
+   const p=POSES[nm];drawBody(0,0,rotDeg*Math.PI/180,i%2?-1:1,p,comOf(p));
+  },zoomK*1.6));
+ },
+ "Вышка":()=>{
+  setVis(-40,40,300,560);
+  ctx.save();
+  const k=cv.height/560;
+  ctx.setTransform(k,0,0,k,cv.width/2-70*k,-40*k);
+  drawTower();
+  ctx.restore();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="#5B7089";ctx.font="600 13px 'Segoe UI',sans-serif";
+  ctx.fillText("вышка целиком: ствол, площадки, косынки, лестница, трамплин 3 м",10,20);
+ },
+ "Вода":()=>{
+  setVis(0,400,420,300);
+  const k=cv.height/300;
+  ctx.setTransform(k,0,0,k,0,-420*k);
+  drawWater();
+  if(foam.length||drops.length)drawFx();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="#5B7089";ctx.font="600 13px 'Segoe UI',sans-serif";
+  ctx.fillText("вода: градиент глубины, каустики, линия поверхности, блик",10,20);
+  ctx.fillText("кнопка «брызги» добавит всплеск",10,38);
+ },
+ "Трибуны":()=>{
+  setVis(0,380,420,120);
+  const k=cv.height/120;
+  ctx.setTransform(k,0,0,k,0,-380*k);
+  drawStands();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="#5B7089";ctx.font="600 13px 'Segoe UI',sans-serif";
+  ctx.fillText("трибуны: четыре ряда, у каждого зрителя своя кожа, причёска, одежда",10,20);
+ },
+ "Судьи":()=>{
+  setVis(200,470,240,90);
+  const k=cv.height/90;
+  ctx.setTransform(k,0,0,k,-200*k,-470*k);
+  drawJudges();
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="#5B7089";ctx.font="600 13px 'Segoe UI',sans-serif";
+  ctx.fillText("судьи: покачивание, дыхание, поворот головы, подъём карточки",10,20);
+ },
+ "Сцена":()=>{
+  const views=[["общий вид",210,340,1],["полёт",172,300,1.5],["вход",210,530,1.7],["оценки",236,472,1.12]];
+  const cols=2,pw=cv.width/cols,ph=cv.height/2;
+  views.forEach((v,i)=>{
+   const ox=(i%cols)*pw, oy=Math.floor(i/cols)*ph;
+   ctx.save();
+   ctx.beginPath();ctx.rect(ox,oy,pw,ph);ctx.clip();
+   const k=Math.min(pw/420,ph/680)*v[3];
+   ctx.setTransform(k,0,0,k,ox+pw/2-v[1]*k,oy+ph/2-v[2]*k);
+   setVis(v[1]-pw/(2*k),v[2]-ph/(2*k),pw/k,ph/k);
+   drawHall();drawStands();
+   ctx.fillStyle="rgba(240,247,253,0.18)";
+   ctx.fillRect(vis.x0-30,vis.y0-30,vis.w+60,478-(vis.y0-30));
+   ctx.fillStyle=GR.deck;ctx.fillRect(vis.x0-30,478,vis.w+60,WY-478);
+   drawJudges();drawWater();drawTower();drawFx();
+   const p=POSES[i===1?"pike":"line"];
+   if(i===1)drawBody(172,m2y(6),rotDeg*Math.PI/180,1,p,comOf(p));
+   else if(i===0)drawBody(standX(),m2y(10)-footBottom(POSES.stand),0,1,POSES.stand,null);
+   ctx.restore();
+   ctx.setTransform(1,0,0,1,0,0);
+   ctx.fillStyle="#5B7089";ctx.font="600 13px 'Segoe UI',sans-serif";
+   ctx.fillText(v[0],ox+10,oy+20);
+  });
+ }
+};
+
+function render(){
+ fitCanvas();
+ ctx.setTransform(1,0,0,1,0,0);
+ ctx.fillStyle="#E8F1FA";ctx.fillRect(0,0,cv.width,cv.height);
+ setVis(0,0,420,680);
+ try{TABS[tab]();}
+ catch(e){
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle="#C0392B";ctx.font="14px monospace";
+  ctx.fillText("Ошибка в art.js: "+e.message,14,cv.height/2);
+  console.error(e);
+ }
+}
+
+/* панель вкладок */
+Object.keys(TABS).forEach(name=>{
+ const b=document.createElement("button");
+ b.textContent=name;b.className=name===tab?"sel":"";
+ b.onclick=()=>{tab=name;[...$("tabs").children].forEach(x=>x.className=x.textContent===name?"sel":"");render();};
+ $("tabs").appendChild(b);
+});
+const bs=document.createElement("button");
+bs.textContent="брызги";
+bs.onclick=()=>{drops=[];rings=[];jets=[];foam=[];crown=[];spawnSplash(210,0.9);render();};
+$("tabs").appendChild(bs);
+
+$("rot").oninput=e=>{rotDeg=+e.target.value;$("rotV").textContent=rotDeg+"°";render();};
+$("zoom").oninput=e=>{zoomK=+e.target.value/10;$("zoomV").textContent=zoomK.toFixed(1)+"×";render();};
+$("anim").onchange=e=>{animOn=e.target.checked;if(animOn)tick();};
+$("reload").onclick=()=>location.reload();
+window.addEventListener("resize",render);
+
+function tick(){
+ if(!animOn)return;
+ tGlob+=1/60;
+ if(cardT>0)cardT-=1/60;
+ const kp=1;
+ drops.forEach(p=>{p.vy+=0.30*kp;p.x+=p.vx*kp;p.y+=p.vy*kp;p.a-=(p.y>WY-1&&p.vy>0?0.20:0.012)*kp;});
+ drops=drops.filter(p=>p.a>0);
+ foam.forEach(f=>{f.t+=1/60;f.r+=(f.rm-f.r)*0.09;f.a-=0.014;});foam=foam.filter(f=>f.a>0);
+ crown.forEach(c=>c.t+=1/60);crown=crown.filter(c=>c.t<c.dur);
+ rings.forEach(g=>{g.r+=(g.v||1.1);g.a-=0.011;});rings=rings.filter(g=>g.a>0);
+ jets.forEach(j=>{j.h+=j.v;j.v-=0.42;});jets=jets.filter(j=>j.h>2);
+ render();
+ requestAnimationFrame(tick);
+}
+
+buildGrads();
+render();
+</script>
+</body>
+</html>
