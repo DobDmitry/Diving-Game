@@ -580,7 +580,7 @@ $("hintBtn").onclick=()=>{hints=!hints;$("hintBtn").className=hints?"on":"";save
 $("sndBtn").onclick=()=>{snd=!snd;$("sndBtn").className=snd?"on":"";if(snd)ac();save();};
 $("hintBtn").className=hints?"on":"";
 $("sndBtn").className=snd?"on":"";
-buildGrads();syncDiveUI();updateInfo();renderRecs();resize();
+buildGrads();syncDiveUI();updateInfo();renderRecs();resize();autoResize();
 requestAnimationFrame(loop);
 </script>
 </body>

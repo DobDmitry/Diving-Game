@@ -175,8 +175,13 @@ function resize(){
  view.s=Math.min(cv.width/W,cv.height/H);
  view.ox=(cv.width-W*view.s)/2;view.oy=(cv.height-H*view.s)/2;
 }
-window.addEventListener("resize",resize);
-if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);
+/* Подписку на изменение размера включает хозяин страницы, а не сам art.js:
+   игре она нужна, а стенду мешает — обработчик менял бы размер холста
+   уже после отрисовки кадра и тем самым его очищал. */
+function autoResize(){
+ window.addEventListener("resize",resize);
+ if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);
+}
 
 const crowd=[];const cc=["#AFA9EC","#9FE1CB","#F5C4B3","#F4C0D1","#85B7EB","#FAC775","#ED93B1",
  "#C8D9F0","#EFB9A0","#B7E3A8","#E8CBEF"];

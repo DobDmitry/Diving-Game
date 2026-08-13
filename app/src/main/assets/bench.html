@@ -77,13 +77,13 @@ let tab="Позы", rotDeg=0, zoomK=4.5, animOn=false;
 
 function fitCanvas(){
  const w=Math.min(1400,Math.round(cv.getBoundingClientRect().width*(window.devicePixelRatio||1)));
- if(cv.width!==w){cv.width=w;cv.height=Math.round(w*0.64);}
+ if(cv.width!==w){cv.width=w;cv.height=Math.round(w*0.82);}
  view.s=1;view.ox=0;view.oy=0;
 }
 
 /* нарисовать что-то в отдельной ячейке контрольного листа */
-function panel(i,n,title,fn,zk){
- const cols=Math.min(n,Math.ceil(Math.sqrt(n)*1.4)),rows=Math.ceil(n/cols);
+function panel(i,n,title,fn,zk,forceCols){
+ const cols=forceCols||Math.min(n,Math.ceil(Math.sqrt(n)*1.4)),rows=Math.ceil(n/cols);
  const pw=cv.width/cols, ph=cv.height/rows;
  const cx=(i%cols)*pw+pw/2, cy=Math.floor(i/cols)*ph+ph/2;
  ctx.save();
@@ -104,7 +104,7 @@ const TABS={
   const names=["stand","hopFw","squatBk","line","openFw","openBk","tuck","pike"];
   names.forEach((nm,i)=>panel(i,names.length,nm,()=>{
    const p=POSES[nm];drawBody(0,0,rotDeg*Math.PI/180,1,p,comOf(p));
-  }));
+  },null,3));
  },
  "Тело":()=>{
   const names=["pike","openFw","openBk","line"];
