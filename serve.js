@@ -9,7 +9,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const PORT = 5180;
+const PORT = 5180;      // если занят, возьмём следующий свободный
 const ROOT = path.join(__dirname, "app", "src", "main", "assets");
 
 const TYPES = {
@@ -25,7 +25,7 @@ if (!fs.existsSync(ROOT)) {
   process.exit(1);
 }
 
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   const rel = decodeURIComponent(req.url.split("?")[0]).replace(/^\/+/, "") || "bench.html";
   const file = path.join(ROOT, rel);
   if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
@@ -38,10 +38,26 @@ http.createServer((req, res) => {
     "Cache-Control": "no-store",   // правки видны сразу, без очистки кеша
   });
   fs.createReadStream(file).pipe(res);
-}).listen(PORT, () => {
+});
+
+/* Порт может оказаться занят — чужим сервером или прошлым запуском этого же.
+   Вместо падения со стеком молча берём следующий свободный. */
+let port = PORT;
+server.on("error", (e) => {
+  if (e.code === "EADDRINUSE" && port < PORT + 20) {
+    port++;
+    server.listen(port);
+  } else {
+    console.error("\n  Не удалось запустить сервер:", e.message, "\n");
+    process.exit(1);
+  }
+});
+server.on("listening", () => {
+  if (port !== PORT) console.log("\n  Порт " + PORT + " был занят, взял " + port);
   console.log("");
-  console.log("  Стенд:  http://localhost:" + PORT + "/bench.html");
-  console.log("  Игра:   http://localhost:" + PORT + "/index.html");
+  console.log("  Стенд:  http://localhost:" + port + "/bench.html");
+  console.log("  Игра:   http://localhost:" + port + "/index.html");
   console.log("");
   console.log("  Остановить — Ctrl+C");
 });
+server.listen(port);
