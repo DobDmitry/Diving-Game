@@ -23,26 +23,43 @@ const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const R=Math.PI/180,SKIN2="#DFA87C",OUTL="#C2865A";
 const SEG={torso:13,thigh:10,shin:10,foot:5.5,uarm:8,farm:9,neck:6.4};
 const POSES={
- stand:    {torso:0, spine:2, head:0, sh:176,el:4,  hip:2,  knee:3,  ank:88},
- armsUpFw: {torso:-3,spine:0, head:-4,sh:8,  el:2,  hip:1,  knee:2,  ank:88},
- armsFwdBk:{torso:2, spine:2, head:0, sh:90, el:4,  hip:2,  knee:3,  ank:88},
+ /* исходное положение: приподнят на носки, корпус слегка наклонён вперёд */
+ stand:    {torso:6, spine:2, head:-3,sh:173,el:4,  hip:2,  knee:3,  ank:70},
+ /* руки вверх на вышке: наклон и стопа те же, что в стойке — спортсмен
+    не отклоняется назад и не опускается на всю стопу */
+ armsUpFw: {torso:6, spine:2, head:-3,sh:8,  el:2,  hip:2,  knee:3,  ank:70},
+ armsFwdBk:{torso:2, spine:2, head:0, sh:90, el:4,  hip:2,  knee:3,  ank:74},
  /* 1 и 4 класс: короткий упругий подсед «как на скакалке», руки остаются сверху */
- hopFw:    {torso:7, spine:2, head:-3,sh:12, el:2,  hip:12, knee:26, ank:111},
+ /* подсед: стопа остаётся на носках, как в стойке */
+ hopFw:    {torso:7, spine:2, head:-3,sh:12, el:2,  hip:12, knee:26, ank:84},
  squatBk:  {torso:12,spine:8, head:-4,sh:204,el:10, hip:60, knee:86, ank:126},
  line:     {torso:0, spine:0, head:2, sh:0,  el:0,  hip:0,  knee:0,  ank:2},
- /* раскрытие 1 и 4 класса: уголок, ноги прямые, руки разведены в стороны —
-    в профиль они уходят к камере и от неё, поэтому сильно сокращены (armF) */
- openFw:   {torso:5, spine:-2,head:10,sh:92, el:-4, hip:84, knee:0,  ank:0, armF:0.32},
+ /* раскрытие 1 и 4 класса: уголок, ноги прямые, руки разведены в стороны.
+    armSpread разводит ближнюю и дальнюю руки веером — в профиль это
+    единственный способ показать разведение, культяпки читались как их отсутствие */
+ openFw:   {torso:5, spine:-2,head:10,sh:128,el:14, hip:125,knee:0,  ank:0, armF:0.94, armFar:0},
  /* раскрытие 2 и 3 класса: «лодочка» с прогибом, руки вдоль тела */
- openBk:   {torso:0, spine:12, head:-11,sh:175,el:-10,hip:7,  knee:0, ank:-3},
- tuck:     {torso:26,spine:34,head:26,sh:112,el:44, hip:124,knee:138,ank:8},
- /* складка: плотный клин, спина плоская, ноги прямые с оттянутым носком,
-    руки обхватывают голени у щиколоток — как в 107B/207B у сборников */
- pike:     {torso:18,spine:4, head:34,sh:147,el:-89,hip:130,knee:0,  ank:0}
+ openBk:   {torso:0, spine:12, head:38, sh:175,el:-10,hip:7,  knee:0, ank:-3},
+ /* группировка: колени к груди, кисти держат голень сразу под коленом,
+    локти вынесены вперёд — углы рук посчитаны обратной кинематикой */
+ tuck:     {torso:26,spine:34,head:36,sh:143,el:-100,hip:132,knee:145,ank:8, foreF:0.33},
+ /* складка: плотный клин, ноги прямые с оттянутым носком,
+    руки обхватывают ноги под коленями, локоть над бедром */
+ pike:     {torso:18,spine:8, head:44,sh:149,el:-87, hip:130,knee:0,  ank:0, armF:0.98,foreF:0.61}
 };
-/* armF — ракурсное сокращение рук (1 = рука в плоскости экрана, 0 = смотрит в камеру) */
-const CH=["torso","spine","head","sh","el","hip","knee","ank","armF"];
-Object.keys(POSES).forEach(k=>{if(POSES[k].armF==null)POSES[k].armF=1;});
+/* armF — ракурсное сокращение рук (1 = рука в плоскости экрана, 0 = смотрит в камеру)
+   armSpread — разведение рук веером: ближняя уходит на столько же вверх,
+   на сколько дальняя вниз. Так в профиль читается «руки в стороны». */
+/* foreF — отдельное сокращение предплечья: при хвате за ногу оно обходит её
+   и уходит в глубину кадра, тогда как плечо остаётся в плоскости экрана.
+   armFar — видимость дальней руки (0 = не рисуем вовсе). */
+const CH=["torso","spine","head","sh","el","hip","knee","ank","armF","armSpread","foreF","armFar"];
+Object.keys(POSES).forEach(k=>{
+ if(POSES[k].armF==null)POSES[k].armF=1;
+ if(POSES[k].armSpread==null)POSES[k].armSpread=0;
+ if(POSES[k].foreF==null)POSES[k].foreF=1;
+ if(POSES[k].armFar==null)POSES[k].armFar=1;
+});
 const OPEN_ST={torso:[0,0.11],head:[0,0.11],hip:[0.03,0.13],knee:[0.07,0.13],ank:[0.05,0.10],sh:[0.09,0.15],el:[0.09,0.13]};
 /* выход из складки на 2 и 3 классе: ноги идут вверх первыми, корпус откидывается назад следом */
 const OPEN_ST_LEGS={hip:[0,0.14],knee:[0,0.11],ank:[0,0.09],torso:[0.07,0.15],head:[0.09,0.13],sh:[0.11,0.16],el:[0.11,0.14]};
@@ -88,9 +105,10 @@ function drawLeg(p,tx,aOff,c,k_,w){
 function drawArm(p,sx,sy,aOff,c,k_,w){
  w=w||0;
  /* при развороте рук в стороны они укорачиваются в ракурсе и кажутся толще, кисть — крупнее */
- const F=p.armF==null?1:p.armF,kk=k_*(1+(1-F)*0.45),hk=1+(1-F)*1.5;
+ const F=p.armF==null?1:p.armF,F2=F*(p.foreF==null?1:p.foreF);
+ const kk=k_*(1+(1-F)*0.45),hk=1+(1-F2)*1.5;
  const a1=p.torso+p.spine+p.sh+aOff,a2=a1+p.el;
- const e=pt(sx,sy,a1,SEG.uarm*F),h=pt(e[0],e[1],a2,SEG.farm*F);
+ const e=pt(sx,sy,a1,SEG.uarm*F),h=pt(e[0],e[1],a2,SEG.farm*F2);
  musc(sx,sy,e[0],e[1],2.4*kk+w,2.3*kk+w,1.5*kk+w,0.38,c);       /* бицепс */
  musc(e[0],e[1],h[0],h[1],1.5*kk+w,1.6*kk+w,1.0*kk+w,0.28,c);   /* предплечье */
  ctx.save();ctx.translate(h[0],h[1]);ctx.rotate(a2*R);
@@ -111,13 +129,37 @@ function comOf(p){
  ].forEach(m=>{x+=m[0]*m[2];y+=m[1]*m[2];});
  return[x,y];
 }
+/* Плавки выключены — ни один из вариантов формы не устроил.
+   Код оставлен рабочим: поставьте BRIEFS = true, чтобы вернуть.
+   Ручки внутри: WAIST — высота пояса, LEGCUT — глубина выреза, TILT — его наклон. */
+const BRIEFS=false;
+function drawBriefs(p,mid){
+ const thA=p.torso+180-p.hip;
+ const WAIST=2.2,LEGCUT=3.6,TILT=28;
+ const kNear=pt(0,0,thA,SEG.thigh);
+ ctx.save();
+ ctx.rotate(p.torso*R);
+ ctx.beginPath();ctx.rect(-16,-WAIST,32,40);ctx.clip();
+ ctx.rotate(-p.torso*R);
+ ctx.rotate((thA+TILT)*R);
+ ctx.beginPath();ctx.rect(-16,-LEGCUT,32,40);ctx.clip();
+ ctx.rotate(-(thA+TILT)*R);
+ musc(0,0,mid[0],mid[1],3.82,3.22,3.92,0.48,SUIT);
+ musc(0,0,kNear[0],kNear[1],3.42,3.12,2.12,0.42,SUIT);
+ ctx.restore();
+ const wp=pt(0,0,p.torso,WAIST);
+ const wa=pt(wp[0],wp[1],p.torso+90,3.5),wb2=pt(wp[0],wp[1],p.torso-90,3.5);
+ ctx.globalAlpha=0.26;limbT(wa[0],wa[1],wb2[0],wb2[1],0.35,0.35,"#F7CBB6");ctx.globalAlpha=1;
+}
 function drawBody(px,py,worldAng,f,p,pivot){
  ctx.save();ctx.translate(px,py);if(worldAng)ctx.rotate(worldAng);ctx.scale(f,1);
  if(pivot)ctx.translate(-pivot[0],-pivot[1]);
  const[mid,shp]=torsoChain(p);
  const OW=0.62,HR=3.7;
  /* дальняя сторона тела — темнее и чуть тоньше: читается объём, а не «ножницы» */
- drawLeg(p,1.4,2,SKIN2,0.92);drawArm(p,shp[0]+1.2,shp[1]+0.4,3,SKIN2,0.92);
+ const spr=p.armSpread||0,far=p.armFar==null?1:p.armFar;
+ drawLeg(p,1.4,2,SKIN2,0.92);
+ if(far>0.02){ctx.globalAlpha=far;drawArm(p,shp[0]+1.2,shp[1]+0.4,3+spr,SKIN2,0.92);ctx.globalAlpha=1;}
  /* корпус: контур, затем таз → талия → грудная клетка → плечи */
  musc(0,0,mid[0],mid[1],3.9+OW,3.3+OW,4.0+OW,0.48,OUTL);
  musc(mid[0],mid[1],shp[0],shp[1],4.0+OW,4.2+OW,3.4+OW,0.52,OUTL);
@@ -125,34 +167,18 @@ function drawBody(px,py,worldAng,f,p,pivot){
  musc(mid[0],mid[1],shp[0],shp[1],4.0,4.2,3.4,0.52,SKIN);
  /* дельтовидные */
  ctx.fillStyle=SKIN;ctx.beginPath();ctx.arc(shp[0],shp[1],2.7,0,7);ctx.fill();
- /* объём: теневая грань со стороны спины + линия грудных */
- const bx=-Math.cos(p.torso*R),by=-Math.sin(p.torso*R);
- ctx.globalAlpha=0.16;
- musc(bx*1.5,by*1.5,mid[0]+bx*1.6,mid[1]+by*1.6,1.9,1.6,1.9,0.5,"#9C6B44");
- limbT(mid[0]+bx*1.7,mid[1]+by*1.7,shp[0]+bx*1.4,shp[1]+by*1.4,2.0,1.6,"#9C6B44");
- ctx.globalAlpha=0.15;
- const pc=pt(mid[0],mid[1],p.torso+p.spine,2.0);
- limbT(pc[0]-bx*1.5,pc[1]-by*1.5,pc[0]+bx*1.5,pc[1]+by*1.5,0.75,0.75,"#A9714A");
- ctx.globalAlpha=1;
  /* ближние конечности: сначала контуры, потом заливка — руки и ноги не слипаются */
  drawLeg(p,0,0,OUTL,1,OW);drawLeg(p,0,0,SKIN,1);
- /* плавки — поверх бедра, иначе в стойке их закрывает нога */
- const hA=pt(0,0,p.torso+180,2.2),hB=pt(0,0,p.torso,1.4);
- const th=pt(0,0,p.torso+180-p.hip,3.2);
- limbT(hA[0],hA[1],hB[0],hB[1],4.1,3.9,SUIT);
- limbT(0,0,th[0],th[1],4.0,3.2,SUIT);
- ctx.globalAlpha=0.24;
- const wb=pt(0,0,p.torso,1.6);limbT(wb[0],wb[1],wb[0],wb[1],3.8,3.8,"#F2A98D");
- ctx.globalAlpha=1;
+ if(BRIEFS)drawBriefs(p,mid);
  const hAng=p.torso+p.spine+p.head;
  const nk=pt(shp[0],shp[1],hAng,2.8);
  const hc=pt(shp[0],shp[1],hAng,SEG.neck);
+ /* контур головы рисует сама headAt — по силуэту, а не окружностью */
  limbT(shp[0],shp[1],nk[0],nk[1],2.4+OW,2.2+OW,OUTL);
- ctx.fillStyle=OUTL;ctx.beginPath();ctx.arc(hc[0],hc[1],HR+OW,0,7);ctx.fill();
  limbT(shp[0],shp[1],nk[0],nk[1],2.4,2.2,SKIN);
  ctx.save();ctx.translate(hc[0],hc[1]);ctx.rotate(hAng*R);headAt(0,0,HR);ctx.restore();
  /* ближняя рука — последней, поверх головы */
- drawArm(p,shp[0],shp[1],0,OUTL,1,OW);drawArm(p,shp[0],shp[1],0,SKIN,1);
+ drawArm(p,shp[0],shp[1],-spr,OUTL,1,OW);drawArm(p,shp[0],shp[1],-spr,SKIN,1);
  ctx.restore();
 }
 function footBottom(p){
@@ -215,20 +241,79 @@ function limbT(x1,y1,x2,y2,w1,w2,c){
  ctx.beginPath();ctx.arc(x1,y1,w1,0,7);ctx.fill();
  ctx.beginPath();ctx.arc(x2,y2,w2,0,7);ctx.fill();
 }
-/* без шапочки и очков: коротко стриженная голова, лицо смотрит в +x */
+/* Голова в профиль, лицом в +x. Вместо круга — силуэт с бровью, носом,
+   губами и подбородком: именно он читается, когда фигура мелкая. */
 function headAt(hx,hy,r){
- ctx.fillStyle=SKIN;
- ctx.beginPath();ctx.arc(hx,hy,r,0,7);ctx.fill();
- ctx.beginPath();ctx.ellipse(hx+r*0.16,hy+r*0.28,r*0.74,r*0.66,0,0,7);ctx.fill();  /* челюсть */
- ctx.fillStyle=HAIR;                                                               /* волосы */
- ctx.beginPath();ctx.arc(hx,hy-r*0.06,r*1.02,Math.PI*0.94,Math.PI*2.03);ctx.closePath();ctx.fill();
- ctx.beginPath();ctx.ellipse(hx-r*0.46,hy-r*0.02,r*0.58,r*0.70,0,0,7);ctx.fill();  /* затылок */
- ctx.fillStyle=SKIN2;                                                              /* ухо */
- ctx.beginPath();ctx.ellipse(hx-r*0.02,hy+r*0.16,r*0.17,r*0.22,0,0,7);ctx.fill();
- ctx.fillStyle="#7A4E33";                                                          /* бровь */
- ctx.beginPath();ctx.ellipse(hx+r*0.46,hy-r*0.30,r*0.24,r*0.08,-0.2,0,7);ctx.fill();
- ctx.fillStyle="#31353B";                                                          /* глаз */
- ctx.beginPath();ctx.arc(hx+r*0.50,hy-r*0.06,r*0.13,0,7);ctx.fill();
+ ctx.save();ctx.translate(hx,hy);
+
+ /* силуэт головы одним путём — он же служит маской для волос */
+ const head=new Path2D();
+ head.moveTo(0,-r);
+ head.quadraticCurveTo(r*0.74,-r*0.94, r*0.84,-r*0.34);     /* лоб */
+ head.quadraticCurveTo(r*0.78,-r*0.20, r*1.10, r*0.04);     /* спинка носа и кончик */
+ head.quadraticCurveTo(r*0.90, r*0.12, r*0.82, r*0.22);     /* под носом */
+ head.quadraticCurveTo(r*0.94, r*0.32, r*0.76, r*0.46);     /* губы */
+ head.quadraticCurveTo(r*0.84, r*0.64, r*0.48, r*0.84);     /* подбородок */
+ head.quadraticCurveTo(r*0.06, r*1.02,-r*0.44, r*0.70);     /* челюсть */
+ head.quadraticCurveTo(-r*0.98, r*0.34,-r*1.00,-r*0.16);    /* затылок */
+ head.quadraticCurveTo(-r*0.96,-r*0.80,-r*0.28,-r*0.99);    /* макушка */
+ head.closePath();
+ /* Область волос: всё выше линии роста и позади неё. Используется дважды —
+    для объёма поверх черепа и для заливки самого черепа. */
+ const hairZone=new Path2D();
+ hairZone.moveTo(r*1.8,-r*1.8);
+ hairZone.lineTo(r*0.90,-r*0.38);                            /* висок */
+ hairZone.quadraticCurveTo(r*0.34,-r*0.72,-r*0.30,-r*0.50);  /* линия роста надо лбом */
+ hairZone.quadraticCurveTo(-r*0.86,-r*0.34,-r*0.90, r*0.34); /* бакенбарда вдоль затылка */
+ hairZone.quadraticCurveTo(-r*0.94, r*0.74,-r*0.62, r*0.92); /* к шее */
+ hairZone.lineTo(-r*1.8, r*1.2);
+ hairZone.lineTo(-r*1.8,-r*1.8);
+ hairZone.closePath();
+
+ /* Объём: тот же силуэт головы, увеличенный, но только в зоне волос —
+    даёт шапку волос над черепом, а не плоскую заливку по нему. */
+ ctx.save();
+ ctx.clip(hairZone);
+ ctx.save();ctx.scale(1.15,1.15);
+ ctx.strokeStyle=OUTL;ctx.lineWidth=r*0.28;ctx.lineJoin="round";ctx.stroke(head);
+ ctx.fillStyle=HAIR;ctx.fill(head);
+ ctx.restore();
+ ctx.restore();
+
+ ctx.strokeStyle=OUTL;ctx.lineWidth=r*0.34;ctx.lineJoin="round";ctx.stroke(head);
+ ctx.fillStyle=SKIN;ctx.fill(head);
+
+ /* волосы по самому черепу */
+ ctx.save();
+ ctx.clip(head);
+ ctx.fillStyle=HAIR;ctx.fill(hairZone);
+ ctx.strokeStyle="rgba(255,255,255,0.16)";ctx.lineWidth=r*0.16;ctx.lineCap="round";
+ ctx.beginPath();ctx.arc(0,-r*0.10,r*0.74,Math.PI*1.15,Math.PI*1.62);ctx.stroke();
+ ctx.restore();
+
+ /* ухо — поверх волос, как в профиль и бывает */
+ ctx.fillStyle=SKIN2;
+ ctx.beginPath();ctx.ellipse(-r*0.10,r*0.16,r*0.18,r*0.24,-0.15,0,7);ctx.fill();
+ ctx.strokeStyle="rgba(150,92,64,0.5)";ctx.lineWidth=r*0.07;
+ ctx.beginPath();ctx.arc(-r*0.10,r*0.16,r*0.09,Math.PI*0.4,Math.PI*1.6);ctx.stroke();
+
+ /* бровь */
+ ctx.fillStyle="#5E3B26";
+ ctx.beginPath();ctx.ellipse(r*0.60,-r*0.34,r*0.22,r*0.075,-0.30,0,7);ctx.fill();
+
+ /* глаз с бликом */
+ ctx.fillStyle="#2E333A";
+ ctx.beginPath();ctx.ellipse(r*0.64,-r*0.10,r*0.13,r*0.155,0,0,7);ctx.fill();
+ ctx.fillStyle="rgba(255,255,255,0.85)";
+ ctx.beginPath();ctx.arc(r*0.69,-r*0.15,r*0.05,0,7);ctx.fill();
+
+ /* тень под носом и рот */
+ ctx.strokeStyle="rgba(150,92,64,0.55)";ctx.lineWidth=r*0.08;ctx.lineCap="round";
+ ctx.beginPath();ctx.moveTo(r*0.86,r*0.15);ctx.lineTo(r*0.74,r*0.17);ctx.stroke();
+ ctx.strokeStyle="#8E4E3C";ctx.lineWidth=r*0.10;
+ ctx.beginPath();ctx.moveTo(r*0.84,r*0.34);ctx.lineTo(r*0.68,r*0.38);ctx.stroke();
+
+ ctx.restore();
 }
 function rrect(x0_,y0_,w,h,r){ctx.beginPath();
  if(ctx.roundRect)ctx.roundRect(x0_,y0_,w,h,r);else ctx.rect(x0_,y0_,w,h);}
@@ -635,8 +720,6 @@ function draw(){
    p=Object.assign({},poseCur,{torso:poseCur.torso+b*0.35,spine:poseCur.spine+b*0.55,
     head:poseCur.head-b*0.3,sh:poseCur.sh+b*0.6});}
   const fy=m2y(10)-footBottom(p);
-  ctx.fillStyle="rgba(70,74,68,0.20)";
-  ctx.beginPath();ctx.ellipse(standX()+d.f*1.5,m2y(10)+1.5,7.5,2,0,0,7);ctx.fill();
   drawBody(standX(),fy,0,d.f,p,null);
  }
  /* HUD — без камеры, в координатах мира 420×680 */

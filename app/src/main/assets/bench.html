@@ -111,6 +111,15 @@ const TABS={
    const p=POSES[nm];drawBody(0,0,rotDeg*Math.PI/180,1,p,comOf(p));
   },null,3));
  },
+ /* подбор плотности уголка: та же поза при разном угле складки */
+ "Уголок":()=>{
+  const folds=[96,86,76,66,56,50];
+  folds.forEach((fold,i)=>panel(i,folds.length,
+   fold+"°"+(fold===96?"  (сейчас)":fold===50?"  (как в pike)":""),()=>{
+    const p=Object.assign({},POSES.openFw,{hip:180-fold});
+    drawBody(0,0,rotDeg*Math.PI/180,1,p,comOf(p));
+  },null,3));
+ },
  "Тело":()=>{
   const names=["pike","openFw","openBk","line"];
   names.forEach((nm,i)=>panel(i,names.length,nm+"  (зеркально →)",()=>{

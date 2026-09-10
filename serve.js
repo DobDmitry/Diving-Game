@@ -9,7 +9,10 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const PORT = 5180;      // если занят, возьмём следующий свободный
+/* 5300 выбран за пределами диапазонов, которые резервирует Windows
+   под Hyper-V и WSL (посмотреть свои: netsh interface ipv4 show excludedportrange protocol=tcp).
+   Если занят или недоступен — сервер сам возьмёт следующий. */
+const PORT = 5300;
 const ROOT = path.join(__dirname, "app", "src", "main", "assets");
 
 const TYPES = {
@@ -43,8 +46,11 @@ const server = http.createServer((req, res) => {
 /* Порт может оказаться занят — чужим сервером или прошлым запуском этого же.
    Вместо падения со стеком молча берём следующий свободный. */
 let port = PORT;
+/* EADDRINUSE — порт занят другим процессом.
+   EACCES — порт попал в зарезервированный Windows диапазон (Hyper-V, WSL).
+   В обоих случаях просто берём следующий. */
 server.on("error", (e) => {
-  if (e.code === "EADDRINUSE" && port < PORT + 20) {
+  if ((e.code === "EADDRINUSE" || e.code === "EACCES") && port < PORT + 40) {
     port++;
     server.listen(port);
   } else {
