@@ -35,6 +35,14 @@ const POSES={
     ни на сантиметр — замаха в прыжках 1 и 4 класса нет, это видно на кадрах 18–30.
     Стопа остаётся на носках, как в стойке */
  hopFw:    {torso:10,spine:2, head:-3,sh:18, el:2,  hip:26, knee:52, ank:84},
+ /* Наскок (только 1 класс). На видео 109C, кадры 18–21: спортсмен идёт по вышке
+    и выпрыгивает, вынося колено вперёд-вверх, вторая нога вытянута вниз.
+    Руки всё это время наверху и вниз не идут. hipB и kneeB отводят дальнюю ногу
+    в прямое положение, lift отрывает фигуру от помоста */
+ hurdleFw: {torso:5, spine:2, head:-3,sh:8,  el:2,  hip:88, knee:96, ank:22,
+            hipB:-86,kneeB:-92,lift:0.32},
+ /* приход с наскока на две ноги: колени принимают вес перед самым толчком */
+ landFw:   {torso:8, spine:2, head:-3,sh:12, el:2,  hip:16, knee:34, ank:78},
  squatBk:  {torso:12,spine:8, head:-4,sh:204,el:10, hip:60, knee:86, ank:126},
  line:     {torso:0, spine:0, head:2, sh:0,  el:0,  hip:0,  knee:0,  ank:2},
  /* раскрытие 1 и 4 класса: уголок, ноги прямые, руки разведены в стороны.
@@ -52,9 +60,11 @@ const POSES={
  /* группировка: колени к груди, кисти держат голень сразу под коленом,
     локти вынесены вперёд — углы рук посчитаны обратной кинематикой */
  tuck:     {torso:26,spine:34,head:36,sh:143,el:-100,hip:132,knee:145,ank:8, foreF:0.33},
- /* складка: плотный клин, ноги прямые с оттянутым носком,
-    руки обхватывают ноги под коленями, локоть над бедром */
- pike:     {torso:18,spine:8, head:44,sh:149,el:-87, hip:130,knee:0,  ank:0, armF:0.98,foreF:0.61}
+ /* складка: плотный клин 42° (было 50° — по видео 107B, кадры 52–58, настоящая
+    складка заметно острее), ноги прямые с оттянутым носком, руки обхватывают
+    ноги под коленями, локоть над бедром. Углы рук пересчитаны обратной
+    кинематикой под новый угол: кисть попадает в точку захвата, локоть — на бедро */
+ pike:     {torso:18,spine:8, head:44,sh:146,el:-104,hip:138,knee:0,  ank:0, armF:0.98,foreF:0.61}
 };
 /* armF — ракурсное сокращение рук (1 = рука в плоскости экрана, 0 = смотрит в камеру)
    armSpread — разведение рук веером: ближняя уходит на столько же вверх,
@@ -62,12 +72,19 @@ const POSES={
 /* foreF — отдельное сокращение предплечья: при хвате за ногу оно обходит её
    и уходит в глубину кадра, тогда как плечо остаётся в плоскости экрана.
    armFar — видимость дальней руки (0 = не рисуем вовсе). */
-const CH=["torso","spine","head","sh","el","hip","knee","ank","armF","armSpread","foreF","armFar"];
+/* hipB и kneeB — добавки к дальней ноге. Обычно обе ноги идут вместе и добавки
+   нулевые; они нужны только наскоку, где одна нога поднята, а вторая вытянута.
+   lift — подъём над вышкой в метрах: спортсмен в наскоке отрывается от помоста. */
+const CH=["torso","spine","head","sh","el","hip","knee","ank","armF","armSpread","foreF","armFar",
+          "hipB","kneeB","lift"];
 Object.keys(POSES).forEach(k=>{
  if(POSES[k].armF==null)POSES[k].armF=1;
  if(POSES[k].armSpread==null)POSES[k].armSpread=0;
  if(POSES[k].foreF==null)POSES[k].foreF=1;
  if(POSES[k].armFar==null)POSES[k].armFar=1;
+ if(POSES[k].hipB==null)POSES[k].hipB=0;
+ if(POSES[k].kneeB==null)POSES[k].kneeB=0;
+ if(POSES[k].lift==null)POSES[k].lift=0;
 });
 const OPEN_ST={torso:[0,0.11],head:[0,0.11],hip:[0.03,0.13],knee:[0.07,0.13],ank:[0.05,0.10],sh:[0.09,0.15],el:[0.09,0.13]};
 /* выход из складки на 2 и 3 классе: ноги идут вверх первыми, корпус откидывается назад следом */
@@ -108,9 +125,9 @@ function musc(x1,y1,x2,y2,w1,wm,w2,at,c){
 }
 /* w — прибавка к толщине: тот же контур, нарисованный тёмным «под» заливкой,
    отделяет руку от ноги, ногу от корпуса и т.д. */
-function drawLeg(p,tx,aOff,c,k_,w){
+function drawLeg(p,tx,aOff,c,k_,w,dHip,dKnee){
  w=w||0;
- const a1=p.torso+180-p.hip+aOff,a2=a1+p.knee,a3=a2-p.ank;
+ const a1=p.torso+180-(p.hip+(dHip||0))+aOff,a2=a1+p.knee+(dKnee||0),a3=a2-p.ank;
  const k=pt(tx,0,a1,SEG.thigh),an=pt(k[0],k[1],a2,SEG.shin),tt=pt(an[0],an[1],a3,SEG.foot);
  musc(tx,0,k[0],k[1],3.5*k_+w,3.2*k_+w,2.2*k_+w,0.42,c);        /* бедро */
  musc(k[0],k[1],an[0],an[1],2.1*k_+w,2.6*k_+w,1.3*k_+w,0.30,c); /* икра */
@@ -180,7 +197,7 @@ function drawBody(px,py,worldAng,f,p,pivot){
  const OW=0.62,HR=3.7;
  /* дальняя сторона тела — темнее и чуть тоньше: читается объём, а не «ножницы» */
  const spr=p.armSpread||0,far=p.armFar==null?1:p.armFar;
- drawLeg(p,1.4,2,SKIN2,0.92);
+ drawLeg(p,1.4,2,SKIN2,0.92,0,p.hipB,p.kneeB);
  if(far>0.02){ctx.globalAlpha=far;drawArm(p,shp[0]+1.2,shp[1]+0.4,3+spr,SKIN2,0.92);ctx.globalAlpha=1;}
  /* корпус: контур, затем таз → талия → грудная клетка → плечи */
  musc(0,0,mid[0],mid[1],3.9+OW,3.3+OW,4.0+OW,0.48,OUTL);
@@ -203,10 +220,15 @@ function drawBody(px,py,worldAng,f,p,pivot){
  drawArm(p,shp[0],shp[1],-spr,OUTL,1,OW);drawArm(p,shp[0],shp[1],-spr,SKIN,1);
  ctx.restore();
 }
+/* самая нижняя точка фигуры — по ней спортсмена ставят на помост.
+   Считаем обе ноги: в наскоке ближняя поднята, и опорной оказывается дальняя */
 function footBottom(p){
- const a1=p.torso+180-p.hip,a2=a1+p.knee,a3=a2-p.ank;
- const k=pt(0,0,a1,SEG.thigh),an=pt(k[0],k[1],a2,SEG.shin),tt=pt(an[0],an[1],a3,SEG.foot);
- return Math.max(an[1],tt[1])+1.1;
+ const leg=(dHip,dKnee)=>{
+  const a1=p.torso+180-(p.hip+dHip),a2=a1+p.knee+dKnee,a3=a2-p.ank;
+  const k=pt(0,0,a1,SEG.thigh),an=pt(k[0],k[1],a2,SEG.shin),tt=pt(an[0],an[1],a3,SEG.foot);
+  return Math.max(an[1],tt[1]);
+ };
+ return Math.max(leg(0,0),leg(p.hipB||0,p.kneeB||0))+1.1;
 }
 const cv=document.getElementById("cv"),ctx=cv.getContext("2d");
 const SKIN="#F2C09A",SUIT="#D85A30",HAIR="#3E2C21";
@@ -750,7 +772,8 @@ function draw(){
   if(state==="idle"||state==="armed"){const b=Math.sin(tGlob*1.5);
    p=Object.assign({},poseCur,{torso:poseCur.torso+b*0.35,spine:poseCur.spine+b*0.55,
     head:poseCur.head-b*0.3,sh:poseCur.sh+b*0.6});}
-  const fy=m2y(10)-footBottom(p);
+  /* lift поднимает фигуру над помостом — в наскоке спортсмен в воздухе */
+  const fy=m2y(10+(p.lift||0))-footBottom(p);
   drawBody(standX(),fy,0,d.f,p,null);
  }
  /* HUD — без камеры, в координатах мира 420×680 */
