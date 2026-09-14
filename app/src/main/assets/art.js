@@ -35,13 +35,27 @@ const POSES={
     ни на сантиметр — замаха в прыжках 1 и 4 класса нет, это видно на кадрах 18–30.
     Стопа остаётся на носках, как в стойке */
  hopFw:    {torso:10,spine:2, head:-3,sh:18, el:2,  hip:26, knee:52, ank:84},
- /* Наскок (только 1 класс). На видео 109C, кадры 18–21: спортсмен идёт по вышке
-    и выпрыгивает, вынося колено вперёд-вверх, вторая нога вытянута вниз.
-    Руки всё это время наверху и вниз не идут. hipB и kneeB отводят дальнюю ногу
-    в прямое положение, lift отрывает фигуру от помоста */
- hurdleFw: {torso:5, spine:2, head:-3,sh:8,  el:2,  hip:88, knee:96, ank:22,
-            hipB:-86,kneeB:-92,lift:0.32},
- /* приход с наскока на две ноги: колени принимают вес перед самым толчком */
+ /* --- разбег и наскок, только 1 класс. Разобрано по видео 109C, кадры 4–30 ---
+    Спортсмен стоит в глубине помоста, идёт к краю широким шагом, выносит колено
+    вперёд-вверх, взлетает и приходит на две ноги ровно на край — оттуда толчок.
+    Руки всё это время наверху и вниз не идут ни разу (кадры 4, 8, 12, 19, 27).
+    adv — положение вдоль помоста в метрах, 0 у самого края, минус в глубину.
+    hipB и kneeB разводят дальнюю ногу, lift отрывает фигуру от помоста. */
+ standBack:{torso:6, spine:2, head:-3,sh:173,el:4,  hip:2,  knee:3,  ank:70, adv:-1.85},
+ readyFw:  {torso:4, spine:2, head:-3,sh:8,  el:2,  hip:2,  knee:3,  ank:40, adv:-1.85},
+ /* шаг: ближняя нога вперёд, дальняя сзади. Корпус держится прямо */
+ walkFw1:  {torso:3, spine:2, head:-3,sh:8,  el:2,  hip:24, knee:14, ank:30,
+            hipB:-46,kneeB:26, adv:-1.32},
+ /* следующий шаг — ноги меняются местами */
+ walkFw2:  {torso:3, spine:2, head:-3,sh:8,  el:2,  hip:-16,knee:30, ank:62,
+            hipB:44, kneeB:-22,adv:-0.82},
+ /* вынос колена: опорная нога ещё на помосте, колено идёт вперёд-вверх */
+ hurdleFw: {torso:4, spine:2, head:-3,sh:8,  el:2,  hip:98, knee:104,ank:22,
+            hipB:-96,kneeB:-100,lift:0.06,adv:-0.60},
+ /* высшая точка наскока: обе ноги в воздухе, колено держится */
+ hurdleAir:{torso:3, spine:2, head:-3,sh:8,  el:2,  hip:92, knee:98, ank:26,
+            hipB:-88,kneeB:-92,lift:0.34,adv:-0.26},
+ /* приход с наскока на две ноги у самого края: колени принимают вес */
  landFw:   {torso:8, spine:2, head:-3,sh:12, el:2,  hip:16, knee:34, ank:78},
  squatBk:  {torso:12,spine:8, head:-4,sh:204,el:10, hip:60, knee:86, ank:126},
  line:     {torso:0, spine:0, head:2, sh:0,  el:0,  hip:0,  knee:0,  ank:2},
@@ -76,7 +90,7 @@ const POSES={
    нулевые; они нужны только наскоку, где одна нога поднята, а вторая вытянута.
    lift — подъём над вышкой в метрах: спортсмен в наскоке отрывается от помоста. */
 const CH=["torso","spine","head","sh","el","hip","knee","ank","armF","armSpread","foreF","armFar",
-          "hipB","kneeB","lift"];
+          "hipB","kneeB","lift","adv"];
 Object.keys(POSES).forEach(k=>{
  if(POSES[k].armF==null)POSES[k].armF=1;
  if(POSES[k].armSpread==null)POSES[k].armSpread=0;
@@ -85,6 +99,7 @@ Object.keys(POSES).forEach(k=>{
  if(POSES[k].hipB==null)POSES[k].hipB=0;
  if(POSES[k].kneeB==null)POSES[k].kneeB=0;
  if(POSES[k].lift==null)POSES[k].lift=0;
+ if(POSES[k].adv==null)POSES[k].adv=0;
 });
 const OPEN_ST={torso:[0,0.11],head:[0,0.11],hip:[0.03,0.13],knee:[0.07,0.13],ank:[0.05,0.10],sh:[0.09,0.15],el:[0.09,0.13]};
 /* выход из складки на 2 и 3 классе: ноги идут вверх первыми, корпус откидывается назад следом */
@@ -774,7 +789,8 @@ function draw(){
     head:poseCur.head-b*0.3,sh:poseCur.sh+b*0.6});}
   /* lift поднимает фигуру над помостом — в наскоке спортсмен в воздухе */
   const fy=m2y(10+(p.lift||0))-footBottom(p);
-  drawBody(standX(),fy,0,d.f,p,null);
+  /* adv ведёт спортсмена вдоль помоста: разбег идёт из глубины к краю */
+  drawBody(standX()+(p.adv||0)*PXM,fy,0,d.f,p,null);
  }
  /* HUD — без камеры, в координатах мира 420×680 */
  ctx.setTransform(view.s,0,0,view.s,view.ox,view.oy);
