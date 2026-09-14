@@ -46,11 +46,13 @@ const server = http.createServer((req, res) => {
 /* Порт может оказаться занят — чужим сервером или прошлым запуском этого же.
    Вместо падения со стеком молча берём следующий свободный. */
 let port = PORT;
+let why = "";
 /* EADDRINUSE — порт занят другим процессом.
    EACCES — порт попал в зарезервированный Windows диапазон (Hyper-V, WSL).
    В обоих случаях просто берём следующий. */
 server.on("error", (e) => {
   if ((e.code === "EADDRINUSE" || e.code === "EACCES") && port < PORT + 40) {
+    if (!why) why = e.code === "EACCES" ? "недоступен системе" : "занят другой программой";
     port++;
     server.listen(port);
   } else {
@@ -59,7 +61,9 @@ server.on("error", (e) => {
   }
 });
 server.on("listening", () => {
-  if (port !== PORT) console.log("\n  Порт " + PORT + " был занят, взял " + port);
+  /* адрес печатаем крупно и с причиной переезда: иначе легко пойти
+     по старому порту и решить, что игра не отвечает */
+  if (port !== PORT) console.log("\n  Порт " + PORT + " " + why + ", перешёл на " + port);
   console.log("");
   console.log("  Стенд:  http://localhost:" + port + "/bench.html");
   console.log("  Игра:   http://localhost:" + port + "/index.html");
