@@ -107,8 +107,8 @@ function setVis(x0v,y0v,w,h){vis={x0:x0v,y0:y0v,w:w,h:h};}
 const TABS={
  "Позы":()=>{
   const names=["stand","standBack","readyFw","walkFw1","walkFw2",
-               "hurdleFw","hurdleAir","landFw","hopFw","squatBk",
-               "line","openFw","openBk","tuck","pike"];
+               "hurdleFw","hurdleAir","landFw","hopRun","hopFw","squatBk",
+               "line","openFw","openTuck","openBk","tuck","pike"];
   names.forEach((nm,i)=>panel(i,names.length,nm,()=>{
    const p=POSES[nm];drawBody(0,0,rotDeg*Math.PI/180,1,p,comOf(p));
   },null,5));

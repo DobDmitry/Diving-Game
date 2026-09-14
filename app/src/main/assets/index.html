@@ -413,7 +413,7 @@ function startPrep(){
  prepQ=d.cls===1
   ?[[POSES.walkFw1,0.15],[POSES.walkFw2,0.14],[POSES.hurdleFw,0.13],
     [POSES.hurdleAir,0.15,"out"],[POSES.landFw,0.11,"in"],
-    [POSES.hopFw,0.07,"out"],[POSES.line,0.08,"in"]]
+    [POSES.hopRun,0.07,"out"],[POSES.line,0.08,"in"]]
   :d.sty==="fw"
    ?[[POSES.hopFw,0.10,"out"],[POSES.line,0.09,"in"]]
    :[[POSES.squatBk,0.24],[POSES.line,0.17,"in"]];
@@ -591,11 +591,16 @@ function release(){
  isDown=false;
  if(state==="flight"&&tucked){tucked=false;opened=true;armsClosed=false;lineupT=0;
   /* 1 и 4 класс раскрываются в уголок руки в стороны, 2 и 3 — в «лодочку» руки вдоль тела;
-     из складки на 2 и 3 классе ноги ведут движение, корпус откидывается за ними */
+     из группировки 1 и 4 класс уголка не показывают, а простреливают сразу в длину */
   /* винтовые раскрываются сразу в прямое винтовое положение — уголка и «лодочки» в них нет */
   const d=dives[sel];
-  setPose(d.tw?POSES.twist:(d.sty==="fw"?POSES.openFw:POSES.openBk),0.22,
-          d.tw?OPEN_ST_LEGS:((d.sty==="bk"&&d.pk)?OPEN_ST_LEGS:OPEN_ST));
+  const open=d.tw?POSES.twist
+   :d.sty==="fw"?(d.pk?POSES.openFw:POSES.openTuck)
+   :POSES.openBk;
+  /* ноги ведут раскрытие у винтов, у складки 2 и 3 класса и у группировки 1 и 4:
+     там первыми выстреливают колени, а корпус доворачивает следом */
+  const legsLead=d.tw||(d.pk?d.sty==="bk":d.sty==="fw");
+  setPose(open,0.22,legsLead?OPEN_ST_LEGS:OPEN_ST);
   sfxTone(340,0.24,0.035,"sine");
   $("actBtn").textContent=d.tw?"Винт пошёл":"Вход!";}
 }
