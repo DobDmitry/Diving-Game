@@ -164,6 +164,7 @@ const dives=RAW.map(r=>Object.assign({num:r[0],cls:r[1],dd:r[2],req:r[3],pk:r[4]
 const idxOf=n=>dives.findIndex(d=>d.num===n);
 /* 1 класс ждёт прыжка в глубине помоста — ему оттуда разбегаться */
 const idlePose=()=>dives[sel].cls===1?POSES.standBack:POSES.stand;
+const restIdle=()=>{trans=null;poseCur=Object.assign({},idlePose());};
 /* произвольная программа финала — 6 прыжков */
 const MEET_PROG=["107B","207C","307C","407C","109C","209C"];
 
@@ -529,7 +530,7 @@ function showResult(){
  $("ovl").style.display="block";
  $("actBtn").textContent=mode==="meet"?(meetDone?"Новая серия":"Прыжок "+(meetRows.length+1)+" из "+MEET_PROG.length):"Ещё попытка";
  $("hintTxt").textContent="Нажми, чтобы выйти на исходную";
- setTimeout(()=>{if(state==="score"){trans=null;poseCur=Object.assign({},idlePose());state="idle";}},400);
+ setTimeout(()=>{if(state==="score"){restIdle();state="idle";}},400);
 }
 function renderMeet(){
  const b=$("meetBox");b.style.display="block";b.innerHTML="";
@@ -557,7 +558,7 @@ function press(){
    if(meetDone){meetRows=[];meetDone=false;meetIdx=0;}
    else meetIdx=meetRows.length;
    sel=idxOf(MEET_PROG[Math.min(meetIdx,MEET_PROG.length-1)]);
-   syncDiveUI();
+   restIdle();syncDiveUI();
   }
   state="armed";pwrT=0;
   setPose(dives[sel].cls===1?POSES.readyFw:(dives[sel].sty==="fw"?POSES.armsUpFw:POSES.armsFwdBk),0.24);
@@ -608,13 +609,13 @@ const modeBox=$("modeBtns"),clsBox=$("clsBtns"),diveBox=$("diveBtns");
  const b=document.createElement("button");b.textContent=m[1];
  b.onclick=()=>{if(busy())return;mode=m[0];
   if(mode==="meet"){meetRows=[];meetDone=false;meetIdx=0;sel=idxOf(MEET_PROG[0]);}
-  $("ovl").style.display="none";state="idle";syncDiveUI();updateInfo();};
+  $("ovl").style.display="none";state="idle";restIdle();syncDiveUI();updateInfo();};
  modeBox.appendChild(b);m.push(b);});
 [1,2,3,4].forEach(c=>{
  const b=document.createElement("button");b.textContent="кл. "+c;
  b.onclick=()=>{if(busy()||mode==="meet")return;curCls=c;
   const first=dives.findIndex(d=>d.cls===c);if(first>=0)sel=first;
-  syncDiveUI();updateInfo();};
+  restIdle();syncDiveUI();updateInfo();};
  clsBox.appendChild(b);b.dataset.cls=c;});
 function busy(){return state==="flight"||state==="prep"||state==="entry";}
 function syncDiveUI(){
@@ -631,7 +632,7 @@ function syncDiveUI(){
   b.className=i===sel&&!done?"sel":done?"on":"";
   b.disabled=mode==="meet";
   b.onclick=()=>{if(busy())return;sel=i;state="idle";$("ovl").style.display="none";
-   trans=null;poseCur=Object.assign({},idlePose());syncDiveUI();updateInfo();};
+   restIdle();syncDiveUI();updateInfo();};
   diveBox.appendChild(b);});
 }
 function updateInfo(){
@@ -650,7 +651,7 @@ $("hintBtn").onclick=()=>{hints=!hints;$("hintBtn").className=hints?"on":"";save
 $("sndBtn").onclick=()=>{snd=!snd;$("sndBtn").className=snd?"on":"";if(snd)ac();save();};
 $("hintBtn").className=hints?"on":"";
 $("sndBtn").className=snd?"on":"";
-buildGrads();syncDiveUI();updateInfo();renderRecs();resize();autoResize();
+buildGrads();restIdle();syncDiveUI();updateInfo();renderRecs();resize();autoResize();
 requestAnimationFrame(loop);
 </script>
 </body>
