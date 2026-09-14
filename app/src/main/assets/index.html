@@ -168,6 +168,24 @@ const G=9.81,SIMK=0.62;
 /* раскрытие: момент инерции растёт примерно в 2.6 раза, поэтому угловая скорость
    сразу падает до K_OPEN от «крутки», а дальше плавно затухает к W_END вплоть до воды */
 const K_OPEN=0.38,TAU=0.30,W_END=12;
+/* Группировка не возникает мгновенно. На видео (109C, кадры 31–39) после отрыва
+   спортсмен ещё вытянут и вращается медленно, и только потом складывается —
+   на это уходит около шестой части полёта. Момент инерции в этот миг тот же,
+   что и в раскрытии, поэтому скорость стартует с той же доли K_OPEN и
+   нарастает до полной крутки с постоянной времени TAU_C.
+
+   По видео разгон занимает около 0.27 с, то есть TAU_C ≈ 0.12. Столько взять
+   нельзя: 209C и 5353B при нынешних скоростях крутки и высоте толчка съедают
+   весь полёт без остатка, и на выход времени уже не хватает. 0.04 — наибольшее
+   значение, при котором все двадцать прыжков остаются чистыми при идеальном
+   тайминге. Чтобы дойти до честных 0.12, нужно либо поднять высоту толчка на
+   24%, либо скорости крутки на 8%. */
+const TAU_C=0.04;
+function tuckW(spd,t){return spd*(K_OPEN+(1-K_OPEN)*(1-Math.exp(-t/TAU_C)));}
+/* сколько градусов даст группировка за время T от начала складывания */
+function tuckRot(spd,T){
+ return spd*(K_OPEN*T+(1-K_OPEN)*(T-TAU_C*(1-Math.exp(-T/TAU_C))));
+}
 /* общий множитель высоты выпрыгивания */
 const H_KICK=0.85;
 /* высота (м), на которой спортсмен начинает выпрямляться в «стрелочку» */
@@ -198,7 +216,7 @@ function lineRot(spd,T){
   const hj=H_KICK*d.hk,T=flight(hj);
   let a=0,b=T;                                   /* бисекция по моменту раскрытия */
   for(let i=0;i<44;i++){const m=(a+b)/2;
-   if(d.spd*m+lineRot(d.spd,T-m)<d.req*360)a=m;else b=m;}
+   if(tuckRot(d.spd,m)+lineRot(d.spd,T-m)<d.req*360)a=m;else b=m;}
   d.tFlight=T;d.tOpen=(a+b)/2;d.tLineIdeal=T-d.tOpen;
   d.tTw=d.tw/TW_REV;                             /* сколько секунд занимает сам винт */
   const v0=Math.sqrt(2*G*hj);
@@ -215,7 +233,7 @@ let sel=idxOf("107B"),curCls=1,mode="train";
 let meetIdx=0,meetRows=[],meetDone=false;
 let state="idle",pwrT=0,zone=null,isDown=false;
 let y=0,vy=0,rot=0,tucked=false,opened=false,x0=128,vx=0,tF=0,tGlob=0;
-let armsClosed=true,lineupT=0,tLine=0,entryX=210,entryAng=0,uwT=0;
+let armsClosed=true,lineupT=0,tLine=0,tTuck=0,entryX=210,entryAng=0,uwT=0;
 /* twDeg — накрученный винт в градусах; растёт только в раскрытии, к выпрямлению замирает */
 let twDeg=0;
 let ripUsed=false,ripQ=0,ripFlash=0;
@@ -325,8 +343,9 @@ function loop(ts){
  if(state==="flight"){
   const s=dts*SIMK;tF+=s;
   vy-=G*s;y+=vy*s;
-  rot+=(tucked?dives[sel].spd:W_END+(dives[sel].spd*K_OPEN-W_END)*Math.exp(-tLine/TAU))*s;
-  if(!tucked)tLine+=s;
+  rot+=(tucked?tuckW(dives[sel].spd,tTuck)
+               :W_END+(dives[sel].spd*K_OPEN-W_END)*Math.exp(-tLine/TAU))*s;
+  if(tucked)tTuck+=s;else tLine+=s;
   /* винт крутится только в раскрытии: до выхода его нет, после выпрямления он погашен */
   if(opened&&!armsClosed)twDeg=Math.min(dives[sel].tw*360,twDeg+TW_REV*360*s);
   if(y<=0.15)enterWater();
@@ -383,7 +402,7 @@ function launch(){
  const z=zone;
  y=H0;vy=Math.sqrt(2*G*z.h*H_KICK*dives[sel].hk);   /* высота выпрыгивания: зона × общий множитель × класс */
  x0=standX();vx=z.vx;tF=0;
- rot=0;tucked=isDown;opened=false;armsClosed=true;lineupT=0;tLine=0;twDeg=0;
+ rot=0;tucked=isDown;opened=false;armsClosed=true;lineupT=0;tLine=0;tTuck=0;twDeg=0;
  ripUsed=false;ripQ=0;
  if(tucked)setPose(dives[sel].pk?POSES.pike:POSES.tuck,0.2,TUCK_ST);
  else setPose(POSES.line,0.22);
@@ -534,7 +553,7 @@ function press(){
   sfxTone(zone.pen===0?520:310,0.22,0.045,"sine");
   startPrep();
  }else if(state==="flight"){
-  if(!tucked&&!opened){tucked=true;armsClosed=true;
+  if(!tucked&&!opened){tucked=true;armsClosed=true;tTuck=0;
    setPose(dives[sel].pk?POSES.pike:POSES.tuck,0.2,TUCK_ST);}
   else if(opened&&!ripUsed){
    ripUsed=true;

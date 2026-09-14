@@ -7,3 +7,5 @@ local.properties
 out/
 *.apk
 *.zip
+/видео/
+/кадры/
