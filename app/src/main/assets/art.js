@@ -42,6 +42,10 @@ const POSES={
  openFw:   {torso:5, spine:-2,head:10,sh:100,el:0,  hip:125,knee:0,  ank:0, armF:0.85, armFar:0},
  /* раскрытие 2 и 3 класса: «лодочка» с прогибом, руки вдоль тела */
  openBk:   {torso:0, spine:12, head:38, sh:175,el:-10,hip:7,  knee:0, ank:-3},
+ /* винтовое положение: тело прямое, одна рука вытянута вдоль головы,
+    вторая прижата к бедру — классическая «ось» для вращения вокруг себя.
+    Веер armSpread разводит ближнюю руку в 0°, дальнюю в 180° */
+ twist:    {torso:0, spine:0, head:2, sh:88, el:0,  hip:0,  knee:0,  ank:2, armSpread:88},
  /* группировка: колени к груди, кисти держат голень сразу под коленом,
     локти вынесены вперёд — углы рук посчитаны обратной кинематикой */
  tuck:     {torso:26,spine:34,head:36,sh:143,el:-100,hip:132,knee:145,ank:8, foreF:0.33},
@@ -117,6 +121,14 @@ function drawArm(p,sx,sy,aOff,c,k_,w){
  ctx.fillStyle=c;ctx.beginPath();
  ctx.ellipse(0,0,(1.1*kk+w)*hk,(1.6*kk+w)*Math.min(hk,1.25),0,0,7);ctx.fill();ctx.restore();
 }
+/* винт — вращение вокруг продольной оси. В строгом профиле его видно только как
+   сжатие силуэта по горизонтали, а знак говорит, каким боком спортсмен к зрителю.
+   Сжатие ограничено снизу: при честном cos фигура на 90° вырождается в палку,
+   на 0.52 она ещё читается как тело, повёрнутое к зрителю боком */
+function twistF(deg){const c=Math.cos(deg*R);return (c<0?-1:1)*Math.max(0.52,Math.abs(c));}
+/* горизонтальный множитель тела в полёте: у обычных прыжков это просто сторона стойки,
+   у винтовых на неё накладывается поворот вокруг продольной оси */
+function bodyF(){const d=dives[sel];return d.tw?d.f*twistF(twDeg):d.f;}
 function comOf(p){
  const[mid,shp]=torsoChain(p);
  const a1=p.torso+180-p.hip,a2=a1+p.knee;
@@ -661,21 +673,30 @@ function drawRipCue(){
 function drawHud(){
  if(state!=="flight")return;
  const d=dives[sel];
- ctx.fillStyle="rgba(255,255,255,0.82)";rrect(268,14,140,hints?66:44,9);ctx.fill();
+ /* у винтовых прыжков в панели на одну строку больше — шкала винта */
+ const twRow=d.tw>0?20:0;
+ ctx.fillStyle="rgba(255,255,255,0.82)";rrect(268,14,140,(hints?66:44)+twRow,9);ctx.fill();
  ctx.fillStyle="#185FA5";ctx.font="600 12px sans-serif";
  ctx.fillText("Сальто "+(rot/360).toFixed(2)+" / "+d.req.toFixed(1),278,31);
  const p=clamp(rot/(d.req*360),0,1);
  ctx.fillStyle="#DCE7F1";rrect(278,37,120,5,2.5);ctx.fill();
  ctx.fillStyle=p>1.02?"#E05252":"#25B47E";rrect(278,37,120*p,5,2.5);ctx.fill();
+ if(d.tw>0){
+  const q=clamp(twDeg/(d.tw*360),0,1);
+  ctx.fillStyle="#8A5BB8";ctx.font="600 11px sans-serif";
+  ctx.fillText("Винт "+(twDeg/360).toFixed(2)+" / "+d.tw.toFixed(1),278,51);
+  ctx.fillStyle="#E4DCEE";rrect(278,56,120,5,2.5);ctx.fill();
+  ctx.fillStyle=q>=1?"#25B47E":"#8A5BB8";rrect(278,56,120*q,5,2.5);ctx.fill();
+ }
  if(!hints)return;
  const k=openErr();
  ctx.fillStyle="#5B7089";ctx.font="10px sans-serif";
- ctx.fillText(tucked?"момент раскрытия":"выход сделан",278,56);
- ctx.fillStyle="#E7EDF3";rrect(278,60,120,7,3.5);ctx.fill();
- ctx.fillStyle="rgba(37,180,126,0.35)";rrect(334,60,8,7,3.5);ctx.fill();
+ ctx.fillText(tucked?"момент раскрытия":"выход сделан",278,56+twRow);
+ ctx.fillStyle="#E7EDF3";rrect(278,60+twRow,120,7,3.5);ctx.fill();
+ ctx.fillStyle="rgba(37,180,126,0.35)";rrect(334,60+twRow,8,7,3.5);ctx.fill();
  if(tucked){const u=clamp(k/200,-1,1);
   ctx.fillStyle=Math.abs(k)<14?"#25B47E":"#0B2545";
-  rrect(336+u*57,58,4,11,2);ctx.fill();}
+  rrect(336+u*57,58+twRow,4,11,2);ctx.fill();}
 }
 function camTarget(){
  if(state==="flight")return[curX()+22,m2y(y),1.5];
@@ -701,20 +722,20 @@ function draw(){
  drawJudges();
  drawWater();
  const d=dives[sel];
- if(state==="flight")drawReflection(curX(),m2y(y),d.dir*rot*R,d.f,poseCur);
+ if(state==="flight")drawReflection(curX(),m2y(y),d.dir*rot*R,bodyF(),poseCur);
  if(state==="entry"){/* уход под воду: часть над водой и часть под ней рисуются раздельно */
   const fade=clamp(1+y/3.2,0,1),pv=comOf(poseCur);
   ctx.save();ctx.beginPath();ctx.rect(vis.x0-30,vis.y0-30,vis.w+60,WY-vis.y0+30);ctx.clip();
-  ctx.globalAlpha=fade;drawBody(entryX,m2y(y),entryAng,d.f,poseCur,pv);ctx.restore();
+  ctx.globalAlpha=fade;drawBody(entryX,m2y(y),entryAng,bodyF(),poseCur,pv);ctx.restore();
   ctx.save();ctx.beginPath();ctx.rect(vis.x0-30,WY,vis.w+60,240);ctx.clip();
-  ctx.globalAlpha=0.55*fade;drawBody(entryX,m2y(y),entryAng,d.f,poseCur,pv);ctx.restore();
+  ctx.globalAlpha=0.55*fade;drawBody(entryX,m2y(y),entryAng,bodyF(),poseCur,pv);ctx.restore();
   ctx.globalAlpha=1;
  }
  drawTower();
  drawFx();
  drawRipCue();
  if(state==="flight"){
-  drawBody(curX(),m2y(y),d.dir*rot*R,d.f,poseCur,comOf(poseCur));
+  drawBody(curX(),m2y(y),d.dir*rot*R,bodyF(),poseCur,comOf(poseCur));
  }else if(state!=="entry"){
   /* дыхание в стойке: живая поза без отдельной анимации */
   let p=poseCur;

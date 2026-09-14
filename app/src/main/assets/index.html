@@ -129,6 +129,12 @@ const CLS={1:{f:1,dir:1,sty:"fw",hk:1.00},2:{f:-1,dir:1,sty:"bk",hk:0.90},
            3:{f:1,dir:-1,sty:"bk",hk:0.81},4:{f:-1,dir:-1,sty:"fw",hk:0.81}};
 /* скорость крутки, об/с — задана на группу «класс × положение», от числа оборотов не зависит */
 const REV={fwC:3.00,bkC:2.50,fwB:2.50,bkB:2.10};
+/* скорость винта, об/с. Винт крутится вокруг продольной оси уже в раскрытии,
+   пока спортсмен летит прямым, и не зависит от числа оборотов сальто */
+const TW_REV=2.6;
+/* строка: номер, класс, КТ, обороты сальто, положение (1 = согнувшись), название, винты.
+   Винтовые прыжки в свободном положении (D) держат складку в начале полёта,
+   а винт делают уже прямыми — поэтому у них pk = 1 */
 const RAW=[
  ["105B",1,2.3,2.5,1,"2½ вперёд, согнувшись"],
  ["107B",1,3.0,3.5,1,"3½ вперёд, согнувшись"],
@@ -141,9 +147,18 @@ const RAW=[
  ["305B",3,3.0,2.5,1,"2½ оборотных, согнувшись"],
  ["307C",3,3.4,3.5,0,"3½ оборотных, в группировке"],
  ["405B",4,2.8,2.5,1,"2½ из задней стойки, согнувшись"],
- ["407C",4,3.2,3.5,0,"3½ из задней стойки, в группировке"]
+ ["407C",4,3.2,3.5,0,"3½ из задней стойки, в группировке"],
+ /* винтовые: КТ с листа «10 метров», колонка положения из номера прыжка */
+ ["5132D",1,2.1,1.5,1,"1½ вперёд с 1 винтом",1.0],
+ ["5152B",1,2.9,2.5,1,"2½ вперёд с 1 винтом, согнувшись",1.0],
+ ["5231D",2,2.0,1.5,1,"1½ назад с ½ винта",0.5],
+ ["5253B",2,3.2,2.5,1,"2½ назад с 1½ винта, согнувшись",1.5],
+ ["5331D",3,2.1,1.5,1,"1½ оборотных с ½ винта",0.5],
+ ["5353B",3,3.3,2.5,1,"2½ оборотных с 1½ винта, согнувшись",1.5],
+ ["5421D",4,1.8,1.0,1,"1 из задней стойки с ½ винта",0.5],
+ ["5432D",4,2.3,1.5,1,"1½ из задней стойки с 1 винтом",1.0]
 ];
-const dives=RAW.map(r=>Object.assign({num:r[0],cls:r[1],dd:r[2],req:r[3],pk:r[4],name:r[5]},CLS[r[1]]));
+const dives=RAW.map(r=>Object.assign({num:r[0],cls:r[1],dd:r[2],req:r[3],pk:r[4],name:r[5],tw:r[6]||0},CLS[r[1]]));
 const idxOf=n=>dives.findIndex(d=>d.num===n);
 /* произвольная программа финала — 6 прыжков */
 const MEET_PROG=["107B","207C","307C","407C","109C","209C"];
@@ -185,6 +200,7 @@ function lineRot(spd,T){
   for(let i=0;i<44;i++){const m=(a+b)/2;
    if(d.spd*m+lineRot(d.spd,T-m)<d.req*360)a=m;else b=m;}
   d.tFlight=T;d.tOpen=(a+b)/2;d.tLineIdeal=T-d.tOpen;
+  d.tTw=d.tw/TW_REV;                             /* сколько секунд занимает сам винт */
   const v0=Math.sqrt(2*G*hj);
   d.yOpen=H0+v0*d.tOpen-G*d.tOpen*d.tOpen/2;
  });
@@ -200,6 +216,8 @@ let meetIdx=0,meetRows=[],meetDone=false;
 let state="idle",pwrT=0,zone=null,isDown=false;
 let y=0,vy=0,rot=0,tucked=false,opened=false,x0=128,vx=0,tF=0,tGlob=0;
 let armsClosed=true,lineupT=0,tLine=0,entryX=210,entryAng=0,uwT=0;
+/* twDeg — накрученный винт в градусах; растёт только в раскрытии, к выпрямлению замирает */
+let twDeg=0;
 let ripUsed=false,ripQ=0,ripFlash=0;
 let drops=[],rings=[],jets=[],bubbles=[],foam=[],crown=[];
 const CARD_T=4.2;let cardT=0,cardScores=[],slow=1,shake=0;
@@ -278,7 +296,10 @@ function openErr(){
 /* ============ цикл ============ */
 let last=0;
 function loop(ts){
- const dt=Math.min(0.033,(ts-last)/1000);last=ts;tGlob+=dt;
+ /* нижняя граница обязательна: если WebView перезапустит отсчёт кадров
+    (сворачивание приложения посреди прыжка), dt уйдёт в минус, и частицы,
+    которые сходятся к своему радиусу через Math.pow(k,dt), разойдутся в бесконечность */
+ const dt=clamp((ts-last)/1000,0,0.033);last=ts;tGlob+=dt;
  /* слоу-мо на подлёте и первые мгновения под водой */
  let want=1;
  if(state==="flight"&&y<1.6&&opened)want=0.4;
@@ -306,6 +327,8 @@ function loop(ts){
   vy-=G*s;y+=vy*s;
   rot+=(tucked?dives[sel].spd:W_END+(dives[sel].spd*K_OPEN-W_END)*Math.exp(-tLine/TAU))*s;
   if(!tucked)tLine+=s;
+  /* винт крутится только в раскрытии: до выхода его нет, после выпрямления он погашен */
+  if(opened&&!armsClosed)twDeg=Math.min(dives[sel].tw*360,twDeg+TW_REV*360*s);
   if(y<=0.15)enterWater();
  }else if(state==="entry"){
   const s=dts*SIMK;uwT+=dts;
@@ -360,14 +383,16 @@ function launch(){
  const z=zone;
  y=H0;vy=Math.sqrt(2*G*z.h*H_KICK*dives[sel].hk);   /* высота выпрыгивания: зона × общий множитель × класс */
  x0=standX();vx=z.vx;tF=0;
- rot=0;tucked=isDown;opened=false;armsClosed=true;lineupT=0;tLine=0;
+ rot=0;tucked=isDown;opened=false;armsClosed=true;lineupT=0;tLine=0;twDeg=0;
  ripUsed=false;ripQ=0;
  if(tucked)setPose(dives[sel].pk?POSES.pike:POSES.tuck,0.2,TUCK_ST);
  else setPose(POSES.line,0.22);
  state="flight";
  sfxTone(120,0.34,0.06,"sine");buzz(12);
  $("actBtn").textContent="Держи — вращение";
- $("hintTxt").textContent="Держи кнопку — группировка. Отпусти — раскрытие. Ещё касание у воды — вход без брызг.";
+ $("hintTxt").textContent=dives[sel].tw
+  ?"Держи — вращение. Отпусти — пойдёт винт, и его надо успеть докрутить до входа: выпускай раньше обычного. Касание у воды — вход без брызг."
+  :"Держи кнопку — группировка. Отпусти — раскрытие. Ещё касание у воды — вход без брызг.";
 }
 function enterWater(){
  entryX=curX();entryAng=dives[sel].dir*rot*R;
@@ -397,6 +422,14 @@ function grade(){
     ded.push(["Слишком низкий выход — не успел выпрямиться",-p]);pen+=p;}
    /* верхней границы нет: при фиксированной крутке у 2½ и 3½ линия длинная по построению */
    if(tLine<0.12){const p=Math.min(1.4,(0.12-tLine)/0.12*1.6);ded.push(["Поздний выход — короткая линия",-p]);pen+=p;}
+  }
+  /* винт нужно успеть докрутить до выпрямления: на входе тело должно быть развёрнуто
+     лицом по направлению прыжка, недокрученный винт судьи видят сразу */
+  if(d.tw>0){
+   const left=d.tw-twDeg/360;
+   if(left>0.02){const p=Math.min(3.0,left*3.6);
+    ded.push(["Винт не закончен — "+(left*360).toFixed(0)+"°",-p]);pen+=p;}
+   else ded.push(["Винт "+d.tw.toFixed(1).replace(".0","")+" — закончен чисто",0]);
   }
   /* вход: базовый вычет 0.55, который снимается точным «рипом» */
   const ep=0.55*(1-ripQ);pen+=ep;
@@ -515,11 +548,12 @@ function release(){
  if(state==="flight"&&tucked){tucked=false;opened=true;armsClosed=false;lineupT=0;
   /* 1 и 4 класс раскрываются в уголок руки в стороны, 2 и 3 — в «лодочку» руки вдоль тела;
      из складки на 2 и 3 классе ноги ведут движение, корпус откидывается за ними */
+  /* винтовые раскрываются сразу в прямое винтовое положение — уголка и «лодочки» в них нет */
   const d=dives[sel];
-  setPose(d.sty==="fw"?POSES.openFw:POSES.openBk,0.22,
-          (d.sty==="bk"&&d.pk)?OPEN_ST_LEGS:OPEN_ST);
+  setPose(d.tw?POSES.twist:(d.sty==="fw"?POSES.openFw:POSES.openBk),0.22,
+          d.tw?OPEN_ST_LEGS:((d.sty==="bk"&&d.pk)?OPEN_ST_LEGS:OPEN_ST));
   sfxTone(340,0.24,0.035,"sine");
-  $("actBtn").textContent="Вход!";}
+  $("actBtn").textContent=d.tw?"Винт пошёл":"Вход!";}
 }
 const act=$("actBtn");
 act.addEventListener("pointerdown",e=>{e.preventDefault();press();});

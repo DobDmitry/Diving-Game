@@ -111,6 +111,13 @@ const TABS={
    const p=POSES[nm];drawBody(0,0,rotDeg*Math.PI/180,1,p,comOf(p));
   },null,3));
  },
+ /* винт: одна и та же поза на разных углах поворота вокруг продольной оси */
+ "Винт":()=>{
+  const ang=[0,45,90,135,180,225,270,315];
+  ang.forEach((a,i)=>panel(i,ang.length,a+"°",()=>{
+   const p=POSES.twist;drawBody(0,0,rotDeg*Math.PI/180,twistF(a),p,comOf(p));
+  },zoomK*0.5,4));
+ },
  /* подбор плотности уголка: та же поза при разном угле складки */
  "Уголок":()=>{
   const folds=[96,86,76,66,56,50];
