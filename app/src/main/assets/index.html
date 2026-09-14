@@ -344,7 +344,7 @@ function loop(ts){
   $("pwr").style.left="calc("+(ph*100)+"% - 2px)";}
  if(state==="prep"&&!trans){
   prepIdx++;
-  if(prepIdx<prepQ.length)setPose(prepQ[prepIdx][0],prepQ[prepIdx][1]);
+  if(prepIdx<prepQ.length)setPose(prepQ[prepIdx][0],prepQ[prepIdx][1],null,prepQ[prepIdx][2]);
   else launch();
  }
  if(state==="flight"){
@@ -404,17 +404,24 @@ function startPrep(){
  /* 1 класс идёт в прыжок с разбега, как на вышке и делают: два широких шага
     из глубины помоста, вынос колена, полёт, приход на две ноги у самого края,
     подсед, вылет. Остальные классы стартуют с места */
+ /* Опора на краю замерена по видео 109C, 30 кадров/с: касание на кадре 33,
+    нижняя точка подседа на 35, отрыв между 37 и 38. То есть гашение 0.07 с,
+    выпрямление 0.08 с, вся опора 0.15 с — вдвое короче, чем было здесь.
+    Кривая на каждом шаге не менее важна длительности: в подсед входим с
+    торможением, а выпрямление разгоняем, чтобы оно кончилось на полной
+    скорости и сразу перешло в полёт. */
  prepQ=d.cls===1
   ?[[POSES.walkFw1,0.15],[POSES.walkFw2,0.14],[POSES.hurdleFw,0.13],
-    [POSES.hurdleAir,0.15],[POSES.landFw,0.12],[POSES.hopFw,0.11],[POSES.line,0.13]]
+    [POSES.hurdleAir,0.15,"out"],[POSES.landFw,0.11,"in"],
+    [POSES.hopFw,0.07,"out"],[POSES.line,0.08,"in"]]
   :d.sty==="fw"
-   ?[[POSES.hopFw,0.12],[POSES.line,0.14]]
-   :[[POSES.squatBk,0.28],[POSES.line,0.28]];
+   ?[[POSES.hopFw,0.10,"out"],[POSES.line,0.09,"in"]]
+   :[[POSES.squatBk,0.24],[POSES.line,0.17,"in"]];
  if(d.f===-1){/* стойка спиной: подъём на носки перед толчком */
   const armed=d.sty==="fw"?POSES.armsUpFw:POSES.armsFwdBk;
   prepQ.unshift([Object.assign({},armed,{ank:36,head:-2}),d.sty==="fw"?0.13:0.22]);
  }
- prepIdx=0;setPose(prepQ[0][0],prepQ[0][1]);state="prep";
+ prepIdx=0;setPose(prepQ[0][0],prepQ[0][1],null,prepQ[0][2]);state="prep";
 }
 function launch(){
  const z=zone;

@@ -113,8 +113,15 @@ const CLOSE_ST={hip:[0,0.16],knee:[0,0.11],ank:[0,0.09],torso:[0,0.14],head:[0.0
 const TUCK_ST={sh:[0,0.13],el:[0,0.13],head:[0.03,0.11],torso:[0.05,0.14],
                hip:[0.06,0.15],knee:[0.06,0.15],ank:[0.06,0.12]};
 let poseCur=Object.assign({},POSES.stand),trans=null;
-function setPose(to,dur,st){trans={from:Object.assign({},poseCur),to:to,t:0,dur:dur,st:st||null};}
-function easeS(u){return u<=0?0:u>=1?1:u*u*(3-2*u);}
+/* Кривая перехода. `s` — плавно с обоих концов, годится почти везде.
+   Но отталкивание ею портится: smoothstep приходит в конец с нулевой скоростью,
+   и выпрямление успевает замереть до того, как сработает launch(). Поэтому
+   `in` — разгон, кончается на полной скорости (толчок переходит в полёт без
+   паузы), `out` — приход с торможением (гашение удара при наскоке). */
+const EASE={s:u=>u*u*(3-2*u), in:u=>u*u, out:u=>u*(2-u)};
+function setPose(to,dur,st,ease){
+ trans={from:Object.assign({},poseCur),to:to,t:0,dur:dur,st:st||null,ez:EASE[ease]||EASE.s};
+}
 function tickPose(dt){
  if(!trans)return;
  trans.t+=dt;let done=true;
@@ -122,7 +129,7 @@ function tickPose(dt){
   let off=0,dur=trans.dur;
   if(trans.st&&trans.st[c]){off=trans.st[c][0];dur=trans.st[c][1];}
   const u=(trans.t-off)/dur;
-  poseCur[c]=trans.from[c]+(trans.to[c]-trans.from[c])*easeS(u);
+  poseCur[c]=trans.from[c]+(trans.to[c]-trans.from[c])*(u<=0?0:u>=1?1:trans.ez(u));
   if(u<1)done=false;
  }
  if(done)trans=null;
